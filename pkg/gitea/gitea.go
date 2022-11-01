@@ -2,7 +2,6 @@ package gitea
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -45,20 +44,52 @@ func (c *Client) Open(name, ref string) (fs.File, error) {
 		ref = c.giteapages
 	}
 
-	owner, repo, filepath, err := splitName(name)
-	if err != nil {
-		return nil, err
+	owner, repo, filepath := splitName(name)
+	// if repo is empty they want to have the gitea-pages repo
+	if repo == "" {
+		repo = c.giteapages
+		filepath = "index.html"
 	}
 
+	// if filepath is empty they want to have the index.html
+	if filepath == "" {
+		filepath = "index.html"
+	}
+
+	// we need to check if the repo exists (and allows access)
 	if !c.allowsPages(owner, repo) {
-		return nil, fs.ErrNotExist
+		// if we're checking the gitea-pages and it doesn't exist, return 404
+		if repo == c.giteapages && !c.hasRepoBranch(owner, repo, c.giteapages) {
+			return nil, fs.ErrNotExist
+		}
+
+		// the repo didn't exist but maybe it's a filepath in the gitea-pages repo
+		// so we need to check if the gitea-pages repo exists
+		filepath = repo
+		repo = c.giteapages
+
+		if !c.allowsPages(owner, repo) || !c.hasRepoBranch(owner, repo, c.giteapages) {
+			return nil, fs.ErrNotExist
+		}
 	}
 
-	if err = c.readConfig(owner, repo); err != nil {
-		return nil, err
+	hasConfig := true
+
+	if err := c.readConfig(owner, repo); err != nil {
+		// we don't need a config for gitea-pages
+		// no config is only exposing the gitea-pages branch
+		if repo != c.giteapages {
+			return nil, err
+		}
+
+		hasConfig = false
 	}
 
-	if !validRefs(ref) {
+	// if we don't have a config and the repo is the gitea-pages
+	// always overwrite the ref to the gitea-pages branch
+	if !hasConfig && (repo == c.giteapages || ref == c.giteapages) {
+		ref = c.giteapages
+	} else if !validRefs(ref) {
 		return nil, fs.ErrNotExist
 	}
 
@@ -155,6 +186,15 @@ func (c *Client) repoTopics(owner, repo string) ([]string, error) {
 	return repos, err
 }
 
+func (c *Client) hasRepoBranch(owner, repo, branch string) bool {
+	b, _, err := c.gc.GetRepoBranch(owner, repo, branch)
+	if err != nil {
+		return false
+	}
+
+	return b.Name == branch
+}
+
 func (c *Client) allowsPages(owner, repo string) bool {
 	topics, err := c.repoTopics(owner, repo)
 	if err != nil {
@@ -172,30 +212,27 @@ func (c *Client) allowsPages(owner, repo string) bool {
 
 func (c *Client) readConfig(owner, repo string) error {
 	cfg, err := c.getRawFileOrLFS(owner, repo, c.giteapages+".toml", c.giteapages)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+	if err != nil {
 		return err
 	}
 
 	viper.SetConfigType("toml")
-	viper.ReadConfig(bytes.NewBuffer(cfg)) //nolint:errcheck
 
-	return nil
+	return viper.ReadConfig(bytes.NewBuffer(cfg))
 }
 
-func splitName(name string) (string, string, string, error) {
+func splitName(name string) (string, string, string) {
 	parts := strings.Split(name, "/")
 
 	// parts contains: ["owner", "repo", "filepath"]
-	// return invalid path if not enough parts
-	if len(parts) < 3 {
-		return "", "", "", fs.ErrInvalid
+	switch len(parts) {
+	case 1:
+		return parts[0], "", ""
+	case 2:
+		return parts[0], parts[1], ""
+	default:
+		return parts[0], parts[1], strings.Join(parts[2:], "/")
 	}
-
-	owner := parts[0]
-	repo := parts[1]
-	filepath := strings.Join(parts[2:], "/")
-
-	return owner, repo, filepath, nil
 }
 
 func validRefs(ref string) bool {
