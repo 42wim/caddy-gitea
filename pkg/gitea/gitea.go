@@ -54,7 +54,7 @@ func (c *Client) Open(name, ref string) (fs.File, error) {
 		return nil, fs.ErrNotExist
 	}
 
-	if err := c.readConfig(owner, repo); err != nil {
+	if err = c.readConfig(owner, repo); err != nil {
 		return nil, err
 	}
 
@@ -123,7 +123,6 @@ func (c *Client) getRawFileOrLFS(owner, repo, filepath, ref string) ([]byte, err
 	defer resp.Body.Close()
 
 	return res, nil
-
 }
 
 var bufPool = sync.Pool{
@@ -178,7 +177,7 @@ func (c *Client) readConfig(owner, repo string) error {
 	}
 
 	viper.SetConfigType("toml")
-	viper.ReadConfig(bytes.NewBuffer(cfg))
+	viper.ReadConfig(bytes.NewBuffer(cfg)) //nolint:errcheck
 
 	return nil
 }
