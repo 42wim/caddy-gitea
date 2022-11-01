@@ -16,8 +16,9 @@ import (
 )
 
 type Client struct {
-	serverURL string
-	token     string
+	serverURL  string
+	token      string
+	giteapages string
 }
 
 type pagesConfig struct {
@@ -27,16 +28,21 @@ type topicsResponse struct {
 	Topics []string `json:"topics"`
 }
 
-func NewClient(serverURL, token string) *Client {
+func NewClient(serverURL, token, giteapages string) *Client {
+	if giteapages == "" {
+		giteapages = "gitea-pages"
+	}
+
 	return &Client{
-		serverURL: serverURL,
-		token:     token,
+		serverURL:  serverURL,
+		token:      token,
+		giteapages: giteapages,
 	}
 }
 
 func (c *Client) Open(name, ref string) (fs.File, error) {
 	if ref == "" {
-		ref = "gitea-pages"
+		ref = c.giteapages
 	}
 
 	owner, repo, filepath, err := splitName(name)
@@ -186,7 +192,7 @@ func (c *Client) allowsPages(owner, repo string) bool {
 	}
 
 	for _, topic := range topics {
-		if topic == "gitea-pages" {
+		if topic == c.giteapages {
 			return true
 		}
 	}
@@ -195,7 +201,7 @@ func (c *Client) allowsPages(owner, repo string) bool {
 }
 
 func (c *Client) readConfig(owner, repo string) error {
-	cfg, err := c.getRawFileOrLFS(owner, repo, "gitea-pages.toml", "gitea-pages")
+	cfg, err := c.getRawFileOrLFS(owner, repo, c.giteapages+".toml", c.giteapages)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
