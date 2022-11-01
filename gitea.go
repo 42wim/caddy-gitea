@@ -1,9 +1,7 @@
 package gitea
 
 import (
-	"errors"
 	"io"
-	"io/fs"
 	"net/http"
 	"strings"
 
@@ -75,9 +73,7 @@ func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, _ caddyhtt
 
 	f, err := m.Client.Open(fp, r.URL.Query().Get("ref"))
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return caddyhttp.Error(http.StatusNotFound, err)
-		}
+		return caddyhttp.Error(http.StatusNotFound, err)
 	}
 
 	_, err = io.Copy(w, f)
