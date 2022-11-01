@@ -45,6 +45,7 @@ func (c *Client) Open(name, ref string) (fs.File, error) {
 	}
 
 	owner, repo, filepath := splitName(name)
+
 	// if repo is empty they want to have the gitea-pages repo
 	if repo == "" {
 		repo = c.giteapages

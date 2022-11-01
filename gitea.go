@@ -20,6 +20,7 @@ func init() {
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
 	var m Middleware
 	err := m.UnmarshalCaddyfile(h.Dispenser)
+
 	return m, err
 }
 
@@ -29,6 +30,7 @@ type Middleware struct {
 	Server     string        `json:"server,omitempty"`
 	Token      string        `json:"token,omitempty"`
 	GiteaPages string        `json:"gitea_pages,omitempty"`
+	Domain     string        `json:"domain,omitempty"`
 }
 
 // CaddyModule returns the Caddy module information.
@@ -53,7 +55,7 @@ func (m *Middleware) Validate() error {
 }
 
 // UnmarshalCaddyfile unmarshals a Caddyfile.
-func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) (err error) {
+func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	for d.Next() {
 		for n := d.Nesting(); d.NextBlock(n); {
 			switch d.Val() {
@@ -63,6 +65,8 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) (err error) {
 				d.Args(&m.Token)
 			case "gitea_pages":
 				d.Args(&m.GiteaPages)
+			case "domain":
+				d.Args(&m.Domain)
 			}
 		}
 	}
@@ -72,15 +76,31 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) (err error) {
 
 // ServeHTTP performs gitea content fetcher.
 func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, _ caddyhttp.Handler) error {
-	h := strings.Split(r.Host, ".")
-	fp := h[0] + r.URL.Path
+	// remove the domain if it's set (works fine if it's empty)
+	host := strings.TrimRight(strings.TrimSuffix(r.Host, m.Domain), ".")
+	h := strings.Split(host, ".")
 
-	f, err := m.Client.Open(fp, r.URL.Query().Get("ref"))
+	fp := h[0] + r.URL.Path
+	ref := r.URL.Query().Get("ref")
+
+	// if we haven't specified a domain, do not support repo.username and branch.repo.username
+	if m.Domain != "" {
+		switch {
+		case len(h) == 2:
+			fp = h[1] + "/" + h[0] + r.URL.Path
+		case len(h) == 3:
+			fp = h[2] + "/" + h[1] + r.URL.Path
+			ref = h[0]
+		}
+	}
+
+	f, err := m.Client.Open(fp, ref)
 	if err != nil {
 		return caddyhttp.Error(http.StatusNotFound, err)
 	}
 
 	_, err = io.Copy(w, f)
+
 	return err
 }
 
