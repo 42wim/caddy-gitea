@@ -2,7 +2,6 @@ package gitea
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	gclient "code.gitea.io/sdk/gitea"
 	"github.com/spf13/viper"
 )
 
@@ -19,25 +19,25 @@ type Client struct {
 	serverURL  string
 	token      string
 	giteapages string
+	gc         *gclient.Client
 }
 
-type pagesConfig struct {
-}
-
-type topicsResponse struct {
-	Topics []string `json:"topics"`
-}
-
-func NewClient(serverURL, token, giteapages string) *Client {
+func NewClient(serverURL, token, giteapages string) (*Client, error) {
 	if giteapages == "" {
 		giteapages = "gitea-pages"
+	}
+
+	gc, err := gclient.NewClient(serverURL, gclient.SetToken(token), gclient.SetGiteaVersion(""))
+	if err != nil {
+		return nil, err
 	}
 
 	return &Client{
 		serverURL:  serverURL,
 		token:      token,
+		gc:         gc,
 		giteapages: giteapages,
-	}
+	}, nil
 }
 
 func (c *Client) Open(name, ref string) (fs.File, error) {
@@ -86,6 +86,8 @@ func (c *Client) getRawFileOrLFS(owner, repo, filepath, ref string) ([]byte, err
 		err      error
 	)
 
+	// TODO: make pr for go-sdk
+	// gitea sdk doesn't support "media" type for lfs/non-lfs
 	giteaURL, err = url.JoinPath(c.serverURL+"/api/v1/repos/", owner, repo, "media", filepath)
 	if err != nil {
 		return nil, err
@@ -150,39 +152,8 @@ func handleMD(res []byte) ([]byte, error) {
 }
 
 func (c *Client) repoTopics(owner, repo string) ([]string, error) {
-	var (
-		giteaURL string
-		err      error
-	)
-
-	giteaURL, err = url.JoinPath(c.serverURL+"/api/v1/repos/", owner, repo, "topics")
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, giteaURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Authorization", "token "+c.token)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	res, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-
-	t := topicsResponse{}
-	json.Unmarshal(res, &t)
-
-	return t.Topics, nil
+	repos, _, err := c.gc.ListRepoTopics(owner, repo, gclient.ListRepoTopicsOptions{})
+	return repos, err
 }
 
 func (c *Client) allowsPages(owner, repo string) bool {

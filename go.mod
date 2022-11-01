@@ -3,6 +3,7 @@ module github.com/42wim/caddy-gitea
 go 1.19
 
 require (
+	code.gitea.io/sdk/gitea v0.15.1
 	github.com/BurntSushi/toml v1.2.1
 	github.com/alecthomas/chroma v0.10.0
 	github.com/caddyserver/caddy/v2 v2.6.2
@@ -45,6 +46,7 @@ require (
 	github.com/google/cel-go v0.12.5 // indirect
 	github.com/google/pprof v0.0.0-20221010195024-131d412537ea // indirect
 	github.com/google/uuid v1.3.0 // indirect
+	github.com/hashicorp/go-version v1.2.1 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/huandu/xstrings v1.3.2 // indirect
 	github.com/imdario/mergo v0.3.13 // indirect

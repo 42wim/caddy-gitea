@@ -41,9 +41,10 @@ func (Middleware) CaddyModule() caddy.ModuleInfo {
 
 // Provision provisions gitea client.
 func (m *Middleware) Provision(ctx caddy.Context) error {
-	m.Client = gitea.NewClient(m.Server, m.Token, m.GiteaPages)
+	var err error
+	m.Client, err = gitea.NewClient(m.Server, m.Token, m.GiteaPages)
 
-	return nil
+	return err
 }
 
 // Validate implements caddy.Validator.
