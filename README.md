@@ -5,6 +5,7 @@
 This allows you to have github pages (with more features) in Gitea.
 This also requires you to setup a wildcard CNAME to your gitea host.
 
+For now markdown files (with `.md` extension) will also be automatically generated to HTML.
 
 <!-- TOC -->
 
