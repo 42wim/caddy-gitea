@@ -14,7 +14,8 @@ This also requires you to setup a wildcard CNAME to your gitea host.
         - [DNS config](#dns-config)
         - [Gitea config](#gitea-config)
             - [gitea-pages repo](#gitea-pages-repo)
-            - [any repo](#any-repo)
+            - [any repo with configurable allowed branch/tag/commits](#any-repo-with-configurable-allowed-branchtagcommits)
+            - [any repo with all branches/tags/commits exposed](#any-repo-with-all-branchestagscommits-exposed)
     - [Building caddy](#building-caddy)
 
 <!-- /TOC -->
@@ -52,10 +53,11 @@ Depending on the gitea config below you'll be able to access your pages using:
 
 ### Gitea config
 
-There are 2 options to expose your repo's as a page, that you can use both at the same time.
+There are multiple options to expose your repo's as a page, that you can use both at the same time.
 
-- creating a gitea-pages repo with a gitea-pages branch
-- adding a gitea-pages branch to any repo of choice
+- creating a gitea-pages repo with a gitea-pages branch and a gitea-pages topic
+- adding a gitea-pages branch to any repo of choice and a gitea-pages topic
+- adding a gitea-pages-allowall topic to your repo (easiest, but less secure)
 
 #### gitea-pages repo
 
@@ -68,7 +70,7 @@ e.g. we'll use the `yourorg` org.
 
 Your content will now be available on <http://yourorg.pages.yourdomain.com:3000/file.html>
 
-#### any repo
+#### any repo with configurable allowed branch/tag/commits
 
 e.g. we'll use the `yourrepo` repo in the `yourorg` org and there is a `file.html` in the `master` branch and a `otherfile.html` in the `dev` branch. The `master` branch is your default branch.
 
@@ -94,6 +96,16 @@ allowedrefs=["main","dev"]
 - Your `otherfile.html` in the `dev` branch will now be available on <http://yourorg.pages.yourdomain.com:3000/yourrepo/file.html?ref=dev>
 - Your `otherfile.html` in the `dev` branch will now be available on <http://dev.yourrepo.yourorg.pages.yourdomain.com:3000/file.html>
 
+#### any repo with all branches/tags/commits exposed
+
+e.g. we'll use the `yourrepo` repo in the `yourorg` org and there is a `file.html` in the `master` branch and a `otherfile.html` in the `dev` branch. The `master` branch is your default branch.
+
+1. Add a `gitea-pages-allowall` topic to the `yourrepo` repo (this is used to opt-in your repo).
+
+- Your `file.html` in the `master` branch will now be available on <http://yourorg.pages.yourdomain.com:3000/yourrepo/file.html>
+- Your `file.html` in the `master` branch will now be available on <http://yourrepo.yourorg.pages.yourdomain.com:3000/file.html>
+- Your `otherfile.html` in the `dev` branch will now be available on <http://yourorg.pages.yourdomain.com:3000/yourrepo/file.html?ref=dev>
+- Your `otherfile.html` in the `dev` branch will now be available on <http://dev.yourrepo.yourorg.pages.yourdomain.com:3000/file.html>
 
 ## Building caddy
 
