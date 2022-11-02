@@ -26,11 +26,12 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 
 // Middleware implements gitea plugin.
 type Middleware struct {
-	Client     *gitea.Client `json:"-"`
-	Server     string        `json:"server,omitempty"`
-	Token      string        `json:"token,omitempty"`
-	GiteaPages string        `json:"gitea_pages,omitempty"`
-	Domain     string        `json:"domain,omitempty"`
+	Client             *gitea.Client `json:"-"`
+	Server             string        `json:"server,omitempty"`
+	Token              string        `json:"token,omitempty"`
+	GiteaPages         string        `json:"gitea_pages,omitempty"`
+	GiteaPagesAllowAll string        `json:"gitea_pages_allowall,omitempty"`
+	Domain             string        `json:"domain,omitempty"`
 }
 
 // CaddyModule returns the Caddy module information.
@@ -44,7 +45,7 @@ func (Middleware) CaddyModule() caddy.ModuleInfo {
 // Provision provisions gitea client.
 func (m *Middleware) Provision(ctx caddy.Context) error {
 	var err error
-	m.Client, err = gitea.NewClient(m.Server, m.Token, m.GiteaPages)
+	m.Client, err = gitea.NewClient(m.Server, m.Token, m.GiteaPages, m.GiteaPagesAllowAll)
 
 	return err
 }
@@ -65,6 +66,8 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				d.Args(&m.Token)
 			case "gitea_pages":
 				d.Args(&m.GiteaPages)
+			case "gitea_pages_allowall":
+				d.Args(&m.GiteaPagesAllowAll)
 			case "domain":
 				d.Args(&m.Domain)
 			}

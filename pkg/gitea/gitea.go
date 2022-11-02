@@ -15,15 +15,20 @@ import (
 )
 
 type Client struct {
-	serverURL  string
-	token      string
-	giteapages string
-	gc         *gclient.Client
+	serverURL          string
+	token              string
+	giteapages         string
+	giteapagesAllowAll string
+	gc                 *gclient.Client
 }
 
-func NewClient(serverURL, token, giteapages string) (*Client, error) {
+func NewClient(serverURL, token, giteapages, giteapagesAllowAll string) (*Client, error) {
 	if giteapages == "" {
 		giteapages = "gitea-pages"
+	}
+
+	if giteapagesAllowAll == "" {
+		giteapagesAllowAll = "gitea-pages-allowall"
 	}
 
 	gc, err := gclient.NewClient(serverURL, gclient.SetToken(token), gclient.SetGiteaVersion(""))
@@ -32,18 +37,15 @@ func NewClient(serverURL, token, giteapages string) (*Client, error) {
 	}
 
 	return &Client{
-		serverURL:  serverURL,
-		token:      token,
-		gc:         gc,
-		giteapages: giteapages,
+		serverURL:          serverURL,
+		token:              token,
+		gc:                 gc,
+		giteapages:         giteapages,
+		giteapagesAllowAll: giteapagesAllowAll,
 	}, nil
 }
 
 func (c *Client) Open(name, ref string) (fs.File, error) {
-	if ref == "" {
-		ref = c.giteapages
-	}
-
 	owner, repo, filepath := splitName(name)
 
 	// if repo is empty they want to have the gitea-pages repo
@@ -58,7 +60,8 @@ func (c *Client) Open(name, ref string) (fs.File, error) {
 	}
 
 	// we need to check if the repo exists (and allows access)
-	if !c.allowsPages(owner, repo) {
+	limited, allowall := c.allowsPages(owner, repo)
+	if !limited && !allowall {
 		// if we're checking the gitea-pages and it doesn't exist, return 404
 		if repo == c.giteapages && !c.hasRepoBranch(owner, repo, c.giteapages) {
 			return nil, fs.ErrNotExist
@@ -69,7 +72,12 @@ func (c *Client) Open(name, ref string) (fs.File, error) {
 		filepath = repo
 		repo = c.giteapages
 
-		if !c.allowsPages(owner, repo) || !c.hasRepoBranch(owner, repo, c.giteapages) {
+		if ref == "" {
+			ref = c.giteapages
+		}
+
+		limited, allowall = c.allowsPages(owner, repo)
+		if !limited && !allowall || !c.hasRepoBranch(owner, repo, c.giteapages) {
 			return nil, fs.ErrNotExist
 		}
 	}
@@ -79,7 +87,7 @@ func (c *Client) Open(name, ref string) (fs.File, error) {
 	if err := c.readConfig(owner, repo); err != nil {
 		// we don't need a config for gitea-pages
 		// no config is only exposing the gitea-pages branch
-		if repo != c.giteapages {
+		if repo != c.giteapages && !allowall {
 			return nil, err
 		}
 
@@ -90,7 +98,7 @@ func (c *Client) Open(name, ref string) (fs.File, error) {
 	// always overwrite the ref to the gitea-pages branch
 	if !hasConfig && (repo == c.giteapages || ref == c.giteapages) {
 		ref = c.giteapages
-	} else if !validRefs(ref) {
+	} else if !validRefs(ref, allowall) {
 		return nil, fs.ErrNotExist
 	}
 
@@ -174,7 +182,9 @@ func handleMD(res []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	res = append([]byte("<!DOCTYPE html>\n<html>\n<body>\n<h1>"), []byte(meta["title"].(string))...)
+	title, _ := meta["title"].(string)
+
+	res = append([]byte("<!DOCTYPE html>\n<html>\n<body>\n<h1>"), []byte(title)...)
 	res = append(res, []byte("</h1>")...)
 	res = append(res, resmd...)
 	res = append(res, []byte("</body></html>")...)
@@ -196,19 +206,25 @@ func (c *Client) hasRepoBranch(owner, repo, branch string) bool {
 	return b.Name == branch
 }
 
-func (c *Client) allowsPages(owner, repo string) bool {
+func (c *Client) allowsPages(owner, repo string) (bool, bool) {
 	topics, err := c.repoTopics(owner, repo)
 	if err != nil {
-		return false
+		return false, false
+	}
+
+	for _, topic := range topics {
+		if topic == c.giteapagesAllowAll {
+			return true, true
+		}
 	}
 
 	for _, topic := range topics {
 		if topic == c.giteapages {
-			return true
+			return true, false
 		}
 	}
 
-	return false
+	return false, false
 }
 
 func (c *Client) readConfig(owner, repo string) error {
@@ -236,7 +252,11 @@ func splitName(name string) (string, string, string) {
 	}
 }
 
-func validRefs(ref string) bool {
+func validRefs(ref string, allowall bool) bool {
+	if allowall {
+		return true
+	}
+
 	validrefs := viper.GetStringSlice("allowedrefs")
 	for _, r := range validrefs {
 		if r == ref {
