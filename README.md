@@ -26,6 +26,7 @@ For now markdown files (with `.md` extension) will also be automatically generat
 ### Caddy config
 
 The Caddyfile below creates a webserver listening on :3000 which will interact with gitea on <https://yourgitea.yourdomain.com> using `agiteatoken` as the token.
+The agiteatoken should be a token from gitea that has the necessary read rights on the repo's that you want to expose.
 
 ```Caddyfile
 {
