@@ -94,6 +94,11 @@ func (c *Client) Open(name, ref string) (fs.File, error) {
 		hasConfig = false
 	}
 
+	// Overwrite default ref if specified
+	if ref == "" && repo != c.giteapages && hasConfig {
+		ref = getDefaultPagesRef()
+	}
+
 	// if we don't have a config and the repo is the gitea-pages
 	// always overwrite the ref to the gitea-pages branch
 	if !hasConfig && (repo == c.giteapages || ref == c.giteapages) {
@@ -269,4 +274,11 @@ func validRefs(ref string, allowall bool) bool {
 	}
 
 	return false
+}
+
+func getDefaultPagesRef() string {
+	if !viper.IsSet("defaultRef") {
+		return ""
+	}
+	return viper.GetString("defaultRef")
 }
